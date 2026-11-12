@@ -351,7 +351,9 @@ function yearsHeld(a){if(!a.acquired)return 0;return Math.max(0,(Date.now()-new 
 // Real value (brief §6.1): nominal ÷ (1+inflation)^years held — applied to birr money and depreciating goods.
 // Gold, foreign cash and real estate are treated as tracking inflation, so real ≈ nominal for them.
 function assetReal(a){const t=ATYPES[a.type]||{};const v=assetBirr(a);if(t.birrMoney||t.depr)return v/Math.pow(1+D.settings.inflation/100,yearsHeld(a));return v}
-function applyAccount(accId,birrDelta){const a=D.assets.find(x=>x.id===accId&&!x.deleted);if(!a||!birrDelta)return;if(a.type==="gold")a.qty=Math.round((num(a.qty)+birrDelta/D.settings.goldPrice)*1e4)/1e4;else if(a.type==='fx')a.qty=r2(num(a.qty)+birrDelta/rateOf(a.currency||'USD'));else a.value=r2(num(a.value)+birrDelta);a.updated=today()}
+// '__cash' = the automatic "Cash in hand" account, created the first time money moves without any account set up.
+function autoCash(){let a=D.assets.find(x=>x.auto&&!x.deleted);if(!a){a={id:uid(),name:'Cash in hand',type:'cash',flavor:'liquid',value:0,acquired:today(),notes:'Created automatically. Edit it to your real balance.',auto:true};D.assets.push(a)}return a}
+function applyAccount(accId,birrDelta){if(accId==='__cash'){if(!birrDelta)return;accId=autoCash().id}const a=D.assets.find(x=>x.id===accId&&!x.deleted);if(!a||!birrDelta)return;if(a.type==="gold")a.qty=Math.round((num(a.qty)+birrDelta/D.settings.goldPrice)*1e4)/1e4;else if(a.type==='fx')a.qty=r2(num(a.qty)+birrDelta/rateOf(a.currency||'USD'));else a.value=r2(num(a.value)+birrDelta);a.updated=today()}
 const accounts=()=>live(D.assets).filter(a=>ATYPES[a.type]?.acct);
 function incomeIn(m){return live(D.income).filter(e=>ym(e.date)===m)}
 function expensesIn(m){return live(D.expenses).filter(e=>ym(e.date)===m)}
@@ -537,7 +539,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-info]');if
 function formData(form){const o={};$$('[name]',form).forEach(el=>{if(el.type==='checkbox')o[el.name]=el.checked;else if(el.type==='radio'){if(el.checked)o[el.name]=el.value}else o[el.name]=el.value});return o}
 const opt=(v,l,sel)=>`<option value="${esc(v)}" ${String(v)===String(sel)?'selected':''}>${esc(l)}</option>`;
 const curSelect=(name,sel,withGold=true)=>`<select name="${name}" aria-label="Currency">${Object.entries(CUR).filter(([k])=>withGold||k!=='gold').map(([k,l])=>opt(k,l,sel)).join('')}</select>`;
-function acctSelect(name,sel,label='Account'){const acc=accounts();return `<label class="f"><span>${label}</span><select name="${name}">${opt('','Don’t change any balance',sel)}${acc.map(a=>opt(a.id,`${a.name} (${a.type==='gold'?fmt(a.qty,2)+' g':a.type==='fx'?fmt(a.qty)+' '+(a.currency||'USD'):birr(a.value)})`,sel)).join('')}</select></label>`}
+function acctSelect(name,sel,label='Account'){const acc=accounts();if(!acc.length)sel='__cash';return `<label class="f"><span>${label}</span><select name="${name}">${acc.length?'':opt('__cash','Cash in hand (new account)',sel)}${acc.map(a=>opt(a.id,`${a.name} (${a.type==='gold'?fmt(a.qty,2)+' g':a.type==='fx'?fmt(a.qty)+' '+(a.currency||'USD'):birr(a.value)})`,sel)).join('')}${opt('','Don’t change any balance (net worth stays the same)',sel)}</select></label>${acc.length?'':'<p class="sub" style="margin-top:-6px">You haven’t added any accounts yet, so this goes into a new “Cash in hand” account. Add your real cash, Telebirr and bank balances in Money.</p>'}`}
 
 /* ---------- Router ---------- */
 const ROUTES={home:viewHome,money:viewMoney,plan:viewPlan,more:viewMore,income:viewIncome,expenses:viewExpenses,reports:viewReports,advisor:viewAdvisor,tax:viewTax,emergency:viewEmergency,settings:viewSettings,data:viewData,guide:viewGuide,about:viewAbout,iqub:viewIqub,iddir:viewIddir,business:viewBusiness,insurance:viewInsurance,family:viewFamily,skills:viewSkills,life:viewLife,learn:viewLearn,import:viewImport};
