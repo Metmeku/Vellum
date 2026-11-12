@@ -42,6 +42,7 @@ jobs:
           else
             echo "::warning::No KEYSTORE_BASE64 secret. The APK will be signed with a temporary debug key, so it can't update an earlier install."
           fi
+          echo "SIGNED_WITH=$([ -n "$KEYSTORE_BASE64" ] && echo release || echo debug)" >> "$GITHUB_ENV"
 
       - name: Build release APK
         env:
@@ -52,7 +53,7 @@ jobs:
       - name: Name the APK
         run: |
           mkdir -p ../dist
-          cp app/build/outputs/apk/release/app-release.apk "../dist/Vellum-1.0.${{ github.run_number }}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "../dist/Vellum-1.0.${{ github.run_number }}-${SIGNED_WITH}.apk"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -66,3 +67,12 @@ jobs:
           name: Vellum 1.0.${{ github.run_number }}
           body: Download the APK below and open it on your Android phone to install or update.
           files: dist/*.apk
+
+      - name: Keep the APK on the 'apk' branch too (easy to fetch)
+        working-directory: dist
+        run: |
+          F=$(ls *.apk)
+          git init -q && git checkout -q -b apk
+          git config user.name "github-actions" && git config user.email "actions@github.com"
+          git add "$F" && git commit -qm "APK $F"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" apk
