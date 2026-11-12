@@ -1,0 +1,47 @@
+plugins { id 'com.android.application' }
+
+// Signing: GitHub Actions passes the release key through environment variables (repo secrets).
+// Without them (e.g. a local Android Studio build) the release APK is signed with the debug key.
+def ksPath = System.getenv("VELLUM_KEYSTORE")
+def runNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger()
+
+android {
+    namespace 'app.vellum.finance'
+    compileSdk 35
+    defaultConfig {
+        applicationId "app.vellum.finance"
+        minSdk 24
+        targetSdk 35
+        versionCode runNumber
+        versionName "1.0.${runNumber}"
+    }
+    signingConfigs {
+        release {
+            if (ksPath) {
+                storeFile file(ksPath)
+                storePassword System.getenv("VELLUM_KS_PASS")
+                keyAlias System.getenv("VELLUM_KEY_ALIAS") ?: "vellum"
+                keyPassword System.getenv("VELLUM_KS_PASS")
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig ksPath ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
+
+// The web app in /web is the single source of truth; copy it into the APK's assets.
+tasks.register('copyWebApp', Copy) {
+    from("${rootDir}/../web") { exclude '_headers', 'sw.js' }
+    into "${projectDir}/src/main/assets/www"
+}
+preBuild.dependsOn copyWebApp
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.12.1'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+}
